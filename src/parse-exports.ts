@@ -1,8 +1,9 @@
-import { lstatSync, readdirSync, readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { type Node, parse } from "acorn";
+import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
+import { dirname, join, resolve, extname } from "node:path";
+import { type Node, Parser } from "acorn";
 import { normalizeSeparators } from "./path";
 import { resolvePathAlias, resolvePathAliasAbsolute } from "./resolve-alias";
+import { tsPlugin } from "@sveltejs/acorn-typescript";
 
 interface NodeImportDeclaration extends Node {
   type: "ImportDeclaration";
@@ -39,6 +40,36 @@ interface ProgramNode extends Node {
 
 const astCache = new Map<string, ProgramNode>();
 
+const fileExtensionSubstitution = new Map<string, string[]>([
+    [".js", [".ts", ".tsx", ".d.ts", ".js", ".jsx"]],
+    [".mjs", [".mts", ".d.mts", ".mjs"]],
+    [".cjs", [".cts", ".d.cts", ".cjs"]]
+]);
+
+/**
+ * Follows TypeScript [file extension substitution](https://www.typescriptlang.org/docs/handbook/modules/reference.html#file-extension-substitution) rules,
+ * testing multiple file extensions, if the original file was in TypeScript.
+ *
+ * @param path - The absolute file path
+ * @param ts - Whether the original file was in TypeScript
+ * @returns The file path with extension modified according to the file extension substitution rules
+ */
+function resolveExtension(path: string, ts: boolean): string {
+  if (existsSync(path) || !ts) return path;
+
+  const extension = extname(path);
+  const substitutions = fileExtensionSubstitution.get(extension);
+  if (!substitutions?.length) return path;
+
+  const extensionless = path.slice(0, -extension.length);
+  for (const substitution of substitutions) {
+    const new_path = `${extensionless}${substitution}`;
+    if (existsSync(new_path)) return new_path;
+  }
+
+  return path;
+}
+
 /**
  * Parses export statements from JavaScript/TypeScript source code.
  *
@@ -48,6 +79,7 @@ const astCache = new Map<string, ProgramNode>();
  *
  * @param source - The source code to parse
  * @param dir - The directory context for resolving relative paths and aliases
+ * @param ts - Whether the code is in TypeScript
  * @returns A map of export names to their source paths and metadata
  *
  * @example
@@ -61,13 +93,15 @@ const astCache = new Map<string, ProgramNode>();
  * // }
  * ```
  */
-export function parseExports(source: string, dir: string) {
+export function parseExports(source: string, dir: string, ts: boolean) {
   let ast = astCache.get(source);
 
   if (!ast) {
-    ast = parse(source, {
+    const parser = ts ? Parser.extend(tsPlugin()) : Parser;
+    ast = parser.parse(source, {
       ecmaVersion: "latest",
       sourceType: "module",
+      locations: ts ? true : undefined,
     }) as ProgramNode;
     astCache.set(source, ast);
   }
@@ -87,9 +121,11 @@ export function parseExports(source: string, dir: string) {
       if (!node.source) continue;
 
       const resolvedSource = resolvePathAliasAbsolute(node.source.value, dir);
-      let file_path = resolve(dir, resolvedSource);
+      let file_path = resolveExtension(resolve(dir, resolvedSource), ts);
+      let source_dir = dirname(node.source.value);
 
       if (!lstatSync(file_path).isFile()) {
+        source_dir = node.source.value;
         const files = readdirSync(file_path);
 
         for (const file of files)
@@ -100,10 +136,10 @@ export function parseExports(source: string, dir: string) {
       }
 
       const export_file = readFileSync(file_path, "utf-8");
-      const exports = parseExports(export_file, dirname(file_path));
+      const exports = parseExports(export_file, dirname(file_path), ts);
 
       for (const [key, value] of Object.entries(exports)) {
-        const source = normalizeSeparators(`./${join(node.source.value, value.source)}`);
+        const source = normalizeSeparators(`./${join(source_dir, value.source)}`);
         exports_by_identifier[key] = {
           ...value,
           source,

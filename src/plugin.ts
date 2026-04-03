@@ -107,7 +107,7 @@ export async function generateBundle(input: string, glob: boolean) {
   let exports: ParsedExports = {};
   if (isFile) {
     const entry = readFileSync(input, "utf-8");
-    exports = parseExports(entry, dir);
+    exports = parseExports(entry, dir, input.endsWith('.ts')); // TODO: this is not a good way to check for TypeScript
   }
 
   const allComponents: ParsedExports = { ...exports };
