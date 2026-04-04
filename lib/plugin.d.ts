@@ -1,6 +1,7 @@
 import { type ParsedComponent } from "./ComponentParser";
 import { type ParsedExports } from "./parse-exports";
 import { type WriteJsonOptions } from "./writer/writer-json";
+import { type WriteLlmsTxtOptions } from "./writer/writer-llms-txt";
 import { type WriteMarkdownOptions } from "./writer/writer-markdown";
 import { type WriteTsDefinitionsOptions } from "./writer/writer-ts-definitions";
 export interface PluginSveldOptions {
@@ -16,6 +17,8 @@ export interface PluginSveldOptions {
     jsonOptions?: Partial<Omit<WriteJsonOptions, "inputDir">>;
     markdown?: boolean;
     markdownOptions?: Partial<WriteMarkdownOptions>;
+    llmsTxt?: boolean;
+    llmsTxtOptions?: Partial<WriteLlmsTxtOptions>;
 }
 type ComponentModuleName = string;
 export interface ComponentDocApi extends ParsedComponent {
