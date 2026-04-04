@@ -9,6 +9,7 @@ import { getSvelteEntry } from "./get-svelte-entry";
 import { type ParsedExports, parseExports } from "./parse-exports";
 import { normalizeSeparators } from "./path";
 import writeJson, { type WriteJsonOptions } from "./writer/writer-json";
+import writeLlmsTxt, { type WriteLlmsTxtOptions } from "./writer/writer-llms-txt";
 import writeMarkdown, { type WriteMarkdownOptions } from "./writer/writer-markdown";
 import writeTsDefinitions, { type WriteTsDefinitionsOptions } from "./writer/writer-ts-definitions";
 
@@ -25,6 +26,8 @@ export interface PluginSveldOptions {
   jsonOptions?: Partial<Omit<WriteJsonOptions, "inputDir">>;
   markdown?: boolean;
   markdownOptions?: Partial<WriteMarkdownOptions>;
+  llmsTxt?: boolean;
+  llmsTxtOptions?: Partial<WriteLlmsTxtOptions>;
 }
 
 type ComponentModuleName = string;
@@ -332,6 +335,14 @@ export function writeOutput(result: GenerateBundleResult, opts: PluginSveldOptio
     writeMarkdown(result.components, {
       outFile: "COMPONENT_INDEX.md",
       ...opts?.markdownOptions,
+    });
+  }
+
+  if (opts?.llmsTxt) {
+    writeLlmsTxt(result.components, {
+      outFile: "llms.txt",
+      outFileFull: "llms-full.txt",
+      ...opts?.llmsTxtOptions,
     });
   }
 }
