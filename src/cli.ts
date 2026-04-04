@@ -36,7 +36,7 @@ export async function cli(process: NodeJS.Process) {
       {} as Record<string, string | boolean>,
     );
 
-  const input = getSvelteEntry() || "src/index.js";
+  const input = getSvelteEntry(options.entry) || "src/index.js";
   const rollup_bundle = await rollup({
     input,
     plugins: [svelte(), resolve()],
